@@ -1,0 +1,102 @@
+"""
+In this case the data are not rectangular csv as in the ANN. Then we will have
+to define differently the train and test sets.
+"""
+
+# Part 1 - Building the CNN
+
+# Importing the Keras libraries and packages
+import numpy as np
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+import keras.utils as image
+
+# Initialising the CNN
+classifier = Sequential()
+
+# Step 1 - Convolution
+"""It is not a standard layer like ANN, it is a convolution layer, so there will be differences.
+- We use Conv2D method
+- 32: feature detectors
+- (3, 3): feature size 3x3. These are not such large windows that we lose sight of the global features of our network.
+to lose sight of the global features of our neural network.
+- input_shape: it is important to enter the size if the images especially if they are not square.
+- input_shape parameters: number of rows, number of columns, number of color channels(depth of the image)
+"""
+classifier.add(Conv2D(filters = 32, kernel_size = (3, 3), input_shape = (64, 64, 3), activation = 'relu'))
+
+# Step 2 - Max Pooling
+"""
+The Max Pooling takes from the original image a window around which
+we calculate the maximum of all the values inside that window
+
+We have a large matrix and we take for example 2x2 matrices and we select the maximum value that falls inside each 2x2 matrix.
+
+We get a double solution:
+    1) We reduce the dimension of the image
+    2) The feature maps will be smaller, reducing the amount of nodes that will be needed in the next step, simplifying the problems like what happens if the image is rotated, or if an image has more or less brightness, etc.
+"""
+classifier.add(MaxPooling2D(pool_size = (2, 2)))
+
+# Adding a second convolutional layers
+classifier.add(Conv2D(32, (3, 3), activation = 'relu'))
+classifier.add(MaxPooling2D(pool_size = (2, 2)))
+
+# Step 3 - Flattening
+classifier.add(Flatten())
+
+# Step 4 - Full connection
+"""
+We use the "Dense" function which is in charge of adding hidden layers to the neural network.
+We must specify their size, i.e. how many nodes are in the next layer.
+"""
+classifier.add(Dense(units = 128, activation = 'relu')) # We use relu because it is a hidden layer to know if the layer is activated or not through a unitary linear rectifier.
+classifier.add(Dense(units = 1, activation = 'sigmoid')) # Output layer uses sigmoid, probability of belonging to each of the classes
+# We use units = 1 because it is a binary classification problem.
+
+# Compiling the CNN
+"""
+- optimizer = 'adam', it is an optimized stochastic method aimed at convergence of the algorithm
+- loss = 'binary_crossentropy', we use binary because it is a case of binary classification.
+If they were more categorical, loss would not be a binary function but a categorical one.
+"""
+classifier.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+
+# Part 2 - Fitting the CNN to the images
+
+from keras.preprocessing.image import ImageDataGenerator
+
+train_datagen = ImageDataGenerator(rescale = 1./255, # Transforms the pixels with values from 0 to 1 (decimal).
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2,
+                                   horizontal_flip = True)
+
+test_datagen = ImageDataGenerator(rescale = 1./255)
+
+training_set = train_datagen.flow_from_directory('dataset/training_set',
+                                                 target_size = (64, 64), # Defined in Step 1
+                                                 batch_size = 32, # Number of images that will pass through the neural network before updating the weights.
+                                                 class_mode = 'binary')
+
+test_set = test_datagen.flow_from_directory('dataset/test_set',
+                                            target_size = (64, 64),
+                                            batch_size = 32,
+                                            class_mode = 'binary')
+
+classifier.fit_generator(training_set,
+                         steps_per_epoch = training_set.n//32, # Samples taken in each training cycle, we will pass on all the images
+                         epochs = 25, # How many epochs we will use for training
+                         validation_data = test_set,
+                         validation_steps = 2000) # Every how many passes we will validate our result in this case 2 every 8 epochs.
+
+import numpy as np
+import keras.utils as image
+test_image = image.load_img('dataset/single_prediction/cat_or_dog_1.jpg', target_size = (64, 64))
+test_image = image.img_to_array(test_image)
+test_image = np.expand_dims(test_image, axis = 0)
+result = classifier.predict(test_image)
+training_set.class_indices
+if result[0][0] == 1:
+    prediction = 'dog'
+else:
+    prediction = 'cat'
